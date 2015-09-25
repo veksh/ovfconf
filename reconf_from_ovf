@@ -251,7 +251,7 @@ if [[ $(grep -c -E "ListenAddress $old_ip" $sshd_conf) != "0" ]]; then
   perl -pi -e 's/^ListenAddress .*/ListenAddress $ENV{new_ip}/' $sshd_conf
 fi
 log_msg "INFO: erasing ssh keys to rebuild them"
-rm $ETC/ssh/ssh_host_key* $ETC/ssh/ssh_host_rsa_key*
+rm $ETC/ssh/ssh_host_*
 
 ## nrpe
 if [[ -r $nrpe_conf && $(grep -c -E "server_address=$old_ip" $nrpe_conf) != "0" ]]; then
