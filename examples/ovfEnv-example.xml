@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Environment oe:id=""
+  xmlns="http://schemas.dmtf.org/ovf/environment/1"
+  xmlns:oe="http://schemas.dmtf.org/ovf/environment/1"
+  xmlns:ve="http://www.vmware.com/schema/ovfenv"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <PlatformSection>
+    <Kind>VMware ESX</Kind>
+    <Version>4.0.0</Version>
+    <Vendor>VMware, Inc.</Vendor>
+    <Locale>en</Locale>
+  </PlatformSection>
+  <ve:EthernetAdapterSection>
+    <ve:Adapter ve:mac="00:50:56:a0:3f:71" ve:network="VM Network"/>
+  </ve:EthernetAdapterSection>
+  <PropertySection>
+    <Property oe:key="hostname" oe:value="falcon"/>
+    <Property oe:key="domain" oe:value="e1.maxidom.ru"/>
+    <Property oe:key="ip" oe:value="10.72.210.3"/>
+    <Property oe:key="gateway" oe:value="10.72.210.254"/>
+    <Property oe:key="dns" oe:value="10.72.131.1"/>
+    <Property oe:key="ntp" oe:value="ntp1.e1.maxidom.ru, ntp2.e1.maxidom.ru"/>
+    <Property oe:key="syslog" oe:value="log.e1.maxidom.ru"/>
+    <Property oe:key="relay" oe:value="smtp.e1.maxidom.ru"/>
+  </PropertySection>
+</Environment>

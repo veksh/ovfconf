@@ -1,0 +1,3 @@
+STARTMODE='onboot'
+BOOTPROTO='static'
+IPADDR='10.0.150.110/24'

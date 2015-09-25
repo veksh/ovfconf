@@ -1,0 +1,41 @@
+#! /bin/sh
+#
+# /etc/init.d/boot.ovfenv
+#
+### BEGIN INIT INFO
+# Provides:          boot.ovfenv
+# Required-Start:    boot.rootfsck boot.localfs
+# Should-Start:      $local_fs
+# Required-Stop:     $null
+# Should-Stop:       $null
+# Default-Start:     B
+# Default-Stop:
+# Short-Description: try system reconf from OVF environment
+# Description: Tries to find OVF environment and reconfigure local system
+#	accordingly: set hostname, domain, ip, gateway etc
+### END INIT INFO
+
+. /etc/rc.status
+
+rc_reset
+
+case "$1" in
+    start)
+        # try reconf
+        /usr/local/sbin/reconf_from_ovf
+	;;
+    stop|restart)
+        # skip / nothing to do
+	;;
+    status)
+	# assume we have been run
+	rc_reset
+	rc_status -v
+	;;
+    *)
+	echo "Usage: $0 {start|stop|status|restart}"
+	exit 1
+	;;
+esac
+
+rc_exit

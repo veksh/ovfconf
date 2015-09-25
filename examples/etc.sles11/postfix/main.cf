@@ -1,0 +1,35 @@
+# postfix check && postfix reload
+queue_directory = /var/spool/postfix
+command_directory = /usr/sbin
+daemon_directory = /usr/lib/postfix
+mail_spool_directory = /var/mail
+data_directory = /var/lib/postfix
+
+sendmail_path = /usr/sbin/sendmail
+newaliases_path = /usr/bin/newaliases
+mailq_path = /usr/bin/mailq
+
+mail_owner = postfix
+setgid_group = maildrop
+
+mydomain = m0.maxidom.ru
+inet_interfaces = 127.0.0.1
+inet_protocols = ipv4
+mynetworks = 127.0.0.0/8
+mydestination = $myhostname, localhost.$mydomain, localhost
+relayhost = smtp.m1.maxidom.ru
+
+alias_maps = hash:/etc/aliases
+
+biff = no
+disable_dns_lookups = yes
+strict_8bitmime = no
+disable_mime_output_conversion = no
+mailbox_size_limit = 0
+message_size_limit = 10240000
+
+sample_directory = /usr/share/doc/packages/postfix/samples
+readme_directory = /usr/share/doc/packages/postfix/README_FILES
+html_directory = /usr/share/doc/packages/postfix/html
+manpage_directory = /usr/share/man
+unknown_local_recipient_reject_code = 450
