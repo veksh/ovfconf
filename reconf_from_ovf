@@ -111,6 +111,8 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf="$ETC/$netcfg_path/route-$if0"
   export ntp_conf="$ETC/chrony.conf"
+  export syslog_type="rsyslog"
+  export syslog_conf=$ETC/rsyslog.conf
 fi
 
 if [[ -r "$ETC/SuSE-release" ]]; then
@@ -124,8 +126,11 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf="$ETC/$netcfg_path/routes"
   export ntp_conf="$ETC/ntp.conf"
+  export syslog_type="syslog-ng"
+  export syslog_conf=$ETC/syslog-ng/rsyslog.conf
 fi
 
+## get current values
 export old_hostname=$(cat $hostname_conf | cut -d. -f1)
 export old_domain=$(cat $hostname_conf | cut -d. -f2-)
 export old_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
@@ -137,23 +142,30 @@ fi
 # or perl -pe 'if(!eof){s/\n/,/}'
 export old_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
 export old_ntp=$(cat $ntp_conf | awk '/^server / {print $2}' | paste -sd ',')
-#export old_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
 export old_relay=$(cat $postfix_conf | awk -F'= ' '/^relayhost/ {print $2}')
+if [[ $syslog_type == "syslog-ng" ]]; then
+  export old_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $syslog_conf)
+else
+  export old_syslog=$(perl -ne 'print $1 if /^[^#].* \@([^:]+):/'  $syslog_conf)
+fi
 
+## check for mandatory params
 if [[ "X$old_hostname" == "X" || "X$old_ip" == "X" ]]; then
   log_msg "ERROR: old hostname or ip missed (something is wrong), exiting"
   exit 1
 fi
 
+## get values from ovf
 export new_hostname=$(get_ovf_var "hostname")
 export new_domain=$(get_ovf_var "domain") 
 export new_ip=$(get_ovf_var "ip")
 export new_gw=$(get_ovf_var "gateway")
 export new_dns=$(get_ovf_var "dns")
 export new_ntp=$(get_ovf_var "ntp")
-#export new_syslog=$(get_ovf_var "syslog")
+export new_syslog=$(get_ovf_var "syslog")
 export new_relay=$(get_ovf_var "relay")
 
+## some checks
 if [[ "X$new_hostname" == "X" ]]; then
   log_msg "ERROR: new hostname is not found, exiting"
   exit 0
@@ -185,13 +197,13 @@ log_msg "INFO: old name: $old_hostname.$old_domain"
 log_msg "INFO: old ip:   $old_ip, gw: $old_gw"
 log_msg "INFO: old dns:  $old_dns"
 log_msg "INFO: old ntp:  $old_ntp"
-#log_msg "INFO: old log:  $old_syslog"
-#log_msg "INFO: old smtp: $old_relay"
+log_msg "INFO: old log:  $old_syslog"
+log_msg "INFO: old smtp: $old_relay"
 log_msg "INFO: new name: $new_hostname.$new_domain"
 log_msg "INFO: new ip:   $new_ip, gw: $new_gw"
 [[ ! -z $new_dns ]] && log_msg "INFO: new dns:  $new_dns"
 [[ ! -z $new_ntp ]] && log_msg "INFO: new ntp:  $new_ntp"
-#[[ ! -z $new_syslog ]] && log_msg "INFO: new log:  $new_syslog"
+[[ ! -z $new_syslog ]] && log_msg "INFO: new log:  $new_syslog"
 [[ ! -z $new_relay ]] && log_msg "INFO: new smtp: $new_relay"
 
 ## first, host name and main ip changes
@@ -242,15 +254,23 @@ if [[ -r $nrpe_conf && $(grep -c -E "server_address=$old_ip" $nrpe_conf) != "0" 
   perl -pi -e 's/server_address=\S+/server_address=$ENV{new_ip}/' $nrpe_conf
 fi
 
-## syslog
-#log_msg "INFO:  changing syslog src ip"
-#perl -pi -e 's/localip\S+ /localip("$ENV{new_ip}") /' $ETC/syslog-ng/syslog-ng.conf
+## syslog: syslog-ng in sles, rsyslog in rhat
+if [[ $syslog_type == "syslog-ng" ]]; then
+  log_msg "INFO:  changing syslog-ng src ip in $syslog_conf"
+  perl -pi -e 's/localip\S+ /localip("$ENV{new_ip}") /' $syslog_conf
 
-## syslog dest
-#if [[ ! -z $new_syslog && $new_syslog != $old_syslog ]]; then
-#  log_msg "NOTE: setting syslog dst to $new_syslog"
-#  perl -pi -e 's/udp\(\s*"\S+" /udp(    "$ENV{new_syslog}" /' $ETC/syslog-ng/syslog-ng.conf
-#fi
+  ## syslog dest
+  if [[ ! -z $new_syslog && $new_syslog != $old_syslog ]]; then
+    log_msg "NOTE: setting syslog dst to $new_syslog"
+    perl -pi -e 's/udp\(\s*"\S+" /udp(    "$ENV{new_syslog}" /' $syslog_conf
+  fi
+fi
+if [[ $syslog_type == "rsyslog" ]]; then
+  if [[ ! -z $new_syslog && $new_syslog != $old_syslog ]]; then
+    log_msg "NOTE: setting syslog dst to $new_syslog"
+    perl -pi -e 's/(^[^#].* \@)[^:]+:/\1$ENV{new_syslog}:/' $syslog_conf
+  fi
+fi
 
 ## postfix: if domain or relay changed
 if [[ $new_domain != $old_domain || (! -z $new_relay && $new_relay != $old_relay) ]]; then
@@ -313,12 +333,16 @@ export cur_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/'
 export cur_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
 export cur_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
 export cur_ntp=$(cat $ntp_conf | awk '/^server / {print $2}' | paste -sd ',')
-#export cur_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
+if [[ $syslog_type == "syslog-ng" ]]; then
+  export cur_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $syslog_conf)
+else
+  export cur_syslog=$(perl -ne 'print $1 if /^[^#].* \@([^:]+):/'  $syslog_conf)
+fi
 export cur_relay=$(cat $postfix_conf | awk -F'= ' '/^relayhost/ {print $2}')
 
 log_msg "INFO: cur name: $cur_hostname.$cur_domain"
 log_msg "INFO: cur ip:   $cur_ip, gw: $cur_gw"
 log_msg "INFO: cur dns:  $cur_dns"
 log_msg "INFO: cur ntp:  $cur_ntp"
-#log_msg "INFO: cur log:  $cur_syslog"
+log_msg "INFO: cur log:  $cur_syslog"
 log_msg "INFO: cur smtp: $cur_relay"
