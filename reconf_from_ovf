@@ -7,9 +7,9 @@
 #    <Property oe:key="domain" oe:value="e1.maxidom.ru"/>
 #    <Property oe:key="ip" oe:value="10.72.210.3"/>
 #    <Property oe:key="gateway" oe:value="10.72.210.254"/>
-#    <Property oe:key="dns" oe:value="10.72.131.1, 10.72.131.2"/>
-#    <Property oe:key="ntp" oe:value="10.72.131.1, 10.72.131.2"/>
-#    <Property oe:key="syslog" oe:value="10.72.202.1"/>
+#    <Property oe:key="dns" oe:value="10.72.131.1,10.72.131.2"/>
+#    <Property oe:key="ntp" oe:value="ntp1.e1.maxidom.ru, ntp2.e1.maxidom.ru"/>
+#    <Property oe:key="syslog" oe:value="log.e1.maxidom.ru"/>
 #    <Property oe:key="relay" oe:value="smtp.e1.maxidom.ru"/>
 # of those only "hostname" and "ip" are mandatory
 
@@ -43,11 +43,8 @@ log_msg() {
   echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
 }
 
+## dump OVF from environment, return 0 on success, 1 if none found
 get_ovf_xml() {
-  # - dump OVF from environment: 'No value found' on stderr if none
-  # rm $OVF_FILE >/dev/null 2>&1
-  # /usr/lib/vmware-tools/sbin/vmware-rpctool 'info-get guestinfo.ovfEnv' > $OVF_FILE 2>/dev/null
-  # - return 0 on success, 1 if none found
   local file_name=$1
   rm $OVF_FILE >/dev/null 2>&1
   if [[ ! -z $file_name && -e $file_name ]]; then
@@ -71,11 +68,17 @@ get_ovf_xml() {
 }
 
 get_ovf_var() {
-  export KEY=$1 && perl -ne 'print "$1\n" if /<Property \S+.key="$ENV{"KEY"}" \S+:value="([^"]+)"\/>/' $OVF_FILE
+  export KEY=$1 && perl -ne 'print "$1\n" if /<Property \S+.key="$ENV{"KEY"}" \S+:value="([^"]+)"\/>/' $OVF_FILE | tr -d ' '
 }
 
 ## main
 # test run: rm -rf etc && cp -r etc_phoenix/ etc && ./reconf_from_ovf ovfEnv.rhino.short.xml 
+
+## check platform
+if [[ ! (-r "$ETC/redhat-release" || -r "$ETC/SuSE-release") ]]; then
+  log_msg "ERROR: only SLES and CentOS/RHEL are supported"
+  exit 1
+fi
 
 ## clear log
 rm $LOG_FILE >/dev/null 2>&1
@@ -88,18 +91,54 @@ if [[ $? == 1 ]]; then
   exit 0
 fi
 
-export old_hostname=$(cat $ETC/HOSTNAME | cut -d. -f1)
-export old_domain=$(cat $ETC/HOSTNAME | cut -d. -f2-)
-export old_ip=$(cat $ETC/sysconfig/network/ifcfg-eth0 | perl -ne 'print $1 if /IPADDR=.([0-9.]+)/')
-export old_gw=$(cat $ETC/sysconfig/network/routes | grep 'default' | cut -d' ' -f2)
-export old_dns1=$(cat $ETC/resolv.conf | grep nameserver | head -1 | awk '{print $2}')
-export old_dns2=$(cat $ETC/resolv.conf | grep nameserver | tail -1 | awk '{print $2}')
-export old_dns="$old_dns1, $old_dns2"
-export old_ntp1=$(cat $ETC/ntp.conf | grep server | head -1 | awk '{print $2}')
-export old_ntp2=$(cat $ETC/ntp.conf | grep server | tail -1 | awk '{print $2}')
-export old_ntp="$old_ntp1, $old_ntp2"
-export old_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
-export old_relay=$(grep relayhost $ETC/postfix/main.cf | awk -F'= ' '{print $2}')
+## common settings
+export resolv_conf="$ETC/resolv.conf"
+export postfix_conf="$ETC/postfix/main.cf"
+export sshd_conf="$ETC/ssh/sshd_config"
+export nrpe_conf="$ETC/nagios/nrpe.cfg"
+export if0=$(ip route show | perl -ne 'print $1 if /default via \S+ dev (\S+)/')
+# also: affects /etc/hosts, /etc/passwd
+
+## platform and version specific
+if [[ -r "$ETC/redhat-release" ]]; then
+  release=$(cat $ETC/redhat-release | perl -ane 'print $1 if /release (\d+)\./')
+  if [[ $release != 7 ]]; then
+    log_msg "ERROR: CentOS/RHEL version 7.x is supported (you have $release)"
+    exit 1
+  fi
+  export netcfg_path="sysconfig/network-scripts"
+  export hostname_conf="$ETC/hostname"
+  export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
+  export route_conf="$ETC/$netcfg_path/route-$if0"
+  export ntp_conf="$ETC/chrony.conf"
+fi
+
+if [[ -r "$ETC/SuSE-release" ]]; then
+  release=$(cat $ETC/SuSE-release | perl -ane 'print $1 if /VERSION = (\d+)/')
+  if [[ $release != 11 ]]; then
+    log_msg "ERROR: SLES version 11.x is required (you have $release)"
+    exit 1
+  fi
+  export netcfg_path="sysconfig/network"
+  export hostname_conf="$ETC/HOSTNAME"
+  export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
+  export route_conf="$ETC/$netcfg_path/routes"
+  export ntp_conf="$ETC/ntp.conf"
+fi
+
+export old_hostname=$(cat $hostname_conf | cut -d. -f1)
+export old_domain=$(cat $hostname_conf | cut -d. -f2-)
+export old_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
+if [[ -e $route_conf ]]; then 
+  export old_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
+else 
+  export old_gw=$(ip route show | perl -ne 'print $1 if /default via (\S+) dev \S+/')
+fi
+# or perl -pe 'if(!eof){s/\n/,/}'
+export old_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
+export old_ntp=$(cat $ntp_conf | awk '/^server / {print $2}' | paste -sd ',')
+#export old_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
+export old_relay=$(cat $postfix_conf | awk -F'= ' '/^relayhost/ {print $2}')
 
 if [[ "X$old_hostname" == "X" || "X$old_ip" == "X" ]]; then
   log_msg "ERROR: old hostname or ip missed (something is wrong), exiting"
@@ -112,7 +151,7 @@ export new_ip=$(get_ovf_var "ip")
 export new_gw=$(get_ovf_var "gateway")
 export new_dns=$(get_ovf_var "dns")
 export new_ntp=$(get_ovf_var "ntp")
-export new_syslog=$(get_ovf_var "syslog")
+#export new_syslog=$(get_ovf_var "syslog")
 export new_relay=$(get_ovf_var "relay")
 
 if [[ "X$new_hostname" == "X" ]]; then
@@ -146,23 +185,23 @@ log_msg "INFO: old name: $old_hostname.$old_domain"
 log_msg "INFO: old ip:   $old_ip, gw: $old_gw"
 log_msg "INFO: old dns:  $old_dns"
 log_msg "INFO: old ntp:  $old_ntp"
-log_msg "INFO: old log:  $old_syslog"
-log_msg "INFO: old smtp: $old_relay"
+#log_msg "INFO: old log:  $old_syslog"
+#log_msg "INFO: old smtp: $old_relay"
 log_msg "INFO: new name: $new_hostname.$new_domain"
 log_msg "INFO: new ip:   $new_ip, gw: $new_gw"
 [[ ! -z $new_dns ]] && log_msg "INFO: new dns:  $new_dns"
 [[ ! -z $new_ntp ]] && log_msg "INFO: new ntp:  $new_ntp"
-[[ ! -z $new_syslog ]] && log_msg "INFO: new log:  $new_syslog"
+#[[ ! -z $new_syslog ]] && log_msg "INFO: new log:  $new_syslog"
 [[ ! -z $new_relay ]] && log_msg "INFO: new smtp: $new_relay"
 
-## first, host name change
+## first, host name and main ip changes
 new_domain=${new_domain:-$old_domain}
 log_msg "NOTE: changing hostname to $new_hostname.$new_domain";
 
 log_msg "INFO:  setting hostname"
 hostname "$new_hostname.$new_domain"
 
-log_msg "INFO:  changing /etc/hosts"
+log_msg "INFO:  changing $ETC/hosts"
 cat > $ETC/hosts <<EOF
 127.0.0.1      localhost
 
@@ -170,109 +209,116 @@ $old_ip        $old_hostname $old_hostname.$old_domain
 $new_ip        $new_hostname $new_hostname.$new_domain
 EOF
 
-log_msg "INFO:  changing /etc/HOSTNAME"
-echo "$new_hostname.$new_domain" > $ETC/HOSTNAME
+log_msg "INFO:  changing $hostname_conf"
+echo "$new_hostname.$new_domain" > $hostname_conf
 
-log_msg "INFO:  changing root name in /etc/passwd"
+log_msg "INFO:  changing root name in $ETC/passwd"
 perl -pi -e 's/^root:x:0:0:[^:]+:/root:x:0:0:root\@$ENV{new_hostname}:/' $ETC/passwd
-
-log_msg "INFO:  erasing ssh keys to rebuild them"
-rm $ETC/ssh/ssh_host_key* $ETC/ssh/ssh_host_rsa_key*
 
 ## change ip
 log_msg "NOTE: chainging main ip to $new_ip"
-log_msg "INFO:  changing eth0 config"
-cat > $ETC/sysconfig/network/ifcfg-eth0 <<EOF
-STARTMODE='onboot'
-BOOTPROTO='static'
-IPADDR='$new_ip/24'
-EOF
+log_msg "INFO:  changing $if0 config"
+perl -pi -e 's/IPADDR=(\W?)[0-9.]+/IPADDR=\1$ENV{new_ip}/' $iface_conf
 
-if [[ $(grep -c -E "ListenAddress +$old_ip" $ETC/ssh/sshd_config) != "0" ]]; then
-  log_msg "INFO:  changing ip in sshd config"
-  perl -pi -e 's/^ListenAddress .*/ListenAddress $ENV{new_ip}/' $ETC/ssh/sshd_config 
-fi
-
-log_msg "INFO:  changing syslog src ip"
-perl -pi -e 's/localip\S+ /localip("$ENV{new_ip}") /' $ETC/syslog-ng/syslog-ng.conf
-
-log_msg "INFO:  changing nrpe listener ip"
-perl -pi -e 's/server_address=\S+/server_address=$ENV{new_ip}/' $ETC/nagios/nrpe.cfg
-
-## change gateway
+## change gateway: routes and and iface config 
 if [[ ! -z $new_gw && $new_gw != $old_gw ]]; then
   log_msg "NOTE: changing gateway address to $new_gw"
-  echo "default $new_gw - -" > $ETC/sysconfig/network/routes
+  echo "default $new_gw - -" > $route_conf
+  # rlel/centos: also in iface config
+  perl -pi -e 's/^GATEWAY=.*/GATEWAY=$ENV{new_gw}/' $iface_conf
 fi
 
-## postfix conf
+## sshd
+if [[ $(grep -c -E "ListenAddress $old_ip" $sshd_conf) != "0" ]]; then
+  log_msg "INFO:  changing ip in sshd config"
+  perl -pi -e 's/^ListenAddress .*/ListenAddress $ENV{new_ip}/' $sshd_conf
+fi
+log_msg "INFO: erasing ssh keys to rebuild them"
+rm $ETC/ssh/ssh_host_key* $ETC/ssh/ssh_host_rsa_key*
+
+## nrpe
+if [[ -r $nrpe_conf && $(grep -c -E "server_address=$old_ip" $nrpe_conf) != "0" ]]; then
+  log_msg "INFO:  changing nrpe listener ip"
+  perl -pi -e 's/server_address=\S+/server_address=$ENV{new_ip}/' $nrpe_conf
+fi
+
+## syslog
+#log_msg "INFO:  changing syslog src ip"
+#perl -pi -e 's/localip\S+ /localip("$ENV{new_ip}") /' $ETC/syslog-ng/syslog-ng.conf
+
+## syslog dest
+#if [[ ! -z $new_syslog && $new_syslog != $old_syslog ]]; then
+#  log_msg "NOTE: setting syslog dst to $new_syslog"
+#  perl -pi -e 's/udp\(\s*"\S+" /udp(    "$ENV{new_syslog}" /' $ETC/syslog-ng/syslog-ng.conf
+#fi
+
+## postfix: if domain or relay changed
 if [[ $new_domain != $old_domain || (! -z $new_relay && $new_relay != $old_relay) ]]; then
-  log_msg "NOTE: postix conf"
+  log_msg "NOTE: changing postix $postfix_conf"
   if [[ $new_domain != $old_domain ]]; then
     log_msg "INFO:  changing domain to $new_domain"
-    perl -pi -e 's/mydomain = \S+/mydomain = $ENV{new_domain}/' $ETC/postfix/main.cf
+    perl -pi -e 's/^mydomain = \S+/mydomain = $ENV{new_domain}/' $postfix_conf
   fi
 
   if [[ ! -z $new_relay && $new_relay != $old_relay ]]; then
     log_msg "INFO:  changing relay to $new_relay"
-    perl -pi -e 's/relayhost = \S+/relayhost = $ENV{new_relay}/' $ETC/postfix/main.cf
+    perl -pi -e 's/^relayhost = \S+/relayhost = $ENV{new_relay}/' $postfix_conf
   fi
 fi
 
-## syslog dest
-if [[ ! -z $new_syslog && $new_syslog != $old_syslog ]]; then
-  log_msg "NOTE: setting syslog dst to $new_syslog"
-  perl -pi -e 's/udp\(\s*"\S+" /udp(    "$ENV{new_syslog}" /' $ETC/syslog-ng/syslog-ng.conf
-fi
-
-## resolv.conf
+## resolv.conf: if domain or dns changed
 if [[ $new_domain != $old_domain || (! -z $new_dns && $new_dns != $old_dns) ]]; then
   new_dns1=$(echo $new_dns | awk -F"[, ;]+" '{print $1}')
   new_dns2=$(echo $new_dns | awk -F"[, ;]+" '{print $2}')
-  dns1=${new_dns1:-$old_dns1}
-  dns2=${new_dns2:-$old_dns2}
-  log_msg "NOTE: setting resolv.conf DNS to $dns1, $dns2"
-  cat > $ETC/resolv.conf <<EOF
-domain $new_domain
-search $new_domain
-nameserver $dns1
-nameserver $dns2
-EOF
+  log_msg "NOTE: setting $resolv_conf DNS to $new_dns"
+  echo "domain $new_domain"   >  $resolv_conf
+  echo "search $new_domain"   >> $resolv_conf
+  echo "nameserver $new_dns1" >> $resolv_conf
+  if [[ ! -z $new_dns2 ]]; then
+    echo "nameserver $new_dns2" >> $resolv_conf
+  fi
+  if [[ $(grep -c -E "^DNS" $iface_conf) != "0" ]]; then
+    rm /tmp/iface_conf >/dev/null 2>&1
+    touch /tmp/iface_conf
+    grep -v -E "^DNS" $iface_conf > /tmp/iface_conf
+    echo "DNS1=$new_dns1" >> /tmp/iface_conf
+    if [[ ! -z $new_dns2 ]]; then
+      echo "DNS2=$new_dns2" >> /tmp/iface_conf
+    fi
+    cp /tmp/iface_conf $iface_conf
+    rm /tmp/iface_conf  
+  fi
 fi
 
 ## ntp.conf
 if [[ ! -z $new_ntp && $new_ntp != $old_ntp ]]; then
   new_ntp1=$(echo $new_ntp | awk -F"[, ;]+" '{print $1}')
   new_ntp2=$(echo $new_ntp | awk -F"[, ;]+" '{print $2}')
-  ntp1=${new_ntp1:-$old_ntp1}
-  ntp2=${new_ntp2:-$old_ntp2}
-  log_msg "NOTE: setting ntp.conf for $ntp1, $ntp2"
-  cat > $ETC/ntp.conf <<EOF
-server $ntp1 iburst
-server $ntp2 iburst prefer
-driftfile /var/lib/ntp/drift/ntp.drift
-logconfig =all
-restrict default ignore
-restrict $ntp1 noquery nomodify notrap
-restrict $ntp2 noquery nomodify notrap
-restrict 127.0.0.1 nopeer
-EOF
+  log_msg "NOTE: setting $ntp_conf for $new_ntp"
+  rm /tmp/ntpconf >/dev/null 2>&1
+  touch /tmp/ntpconf
+  grep -v -E '^server ' $ntp_conf > /tmp/ntpconf
+  echo "server $new_ntp1 iburst" >> /tmp/ntpconf
+  if [[ ! -z $new_ntp2 ]]; then
+    echo "server $new_ntp2 iburst" >> /tmp/ntpconf
+  fi
+  cp /tmp/ntpconf $ntp_conf
+  rm /tmp/ntpconf
 fi
 
 ## checking resluts
-cur_hostname=$(cat $ETC/HOSTNAME | cut -d. -f1)
-cur_domain=$(cat $ETC/HOSTNAME | cut -d. -f2-)
-cur_ip=$(cat $ETC/sysconfig/network/ifcfg-eth0 | perl -ne 'print $1 if /IPADDR=.([0-9.]+)/')
-cur_gw=$(cat $ETC/sysconfig/network/routes | grep 'default' | cut -d' ' -f2)
-cur_dns1=$(cat $ETC/resolv.conf | grep nameserver | head -1 | awk '{print $2}')
-cur_dns2=$(cat $ETC/resolv.conf | grep nameserver | tail -1 | awk '{print $2}')
-cur_ntp1=$(cat $ETC/ntp.conf | grep server | head -1 | awk '{print $2}')
-cur_ntp2=$(cat $ETC/ntp.conf | grep server | tail -1 | awk '{print $2}')
-cur_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
-cur_relay=$(grep relayhost $ETC/postfix/main.cf | awk -F'= ' '{print $2}')
+export cur_hostname=$(cat $hostname_conf | cut -d. -f1)
+export cur_domain=$(cat $hostname_conf | cut -d. -f2-)
+export cur_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
+export cur_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
+export cur_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
+export cur_ntp=$(cat $ntp_conf | awk '/^server / {print $2}' | paste -sd ',')
+#export cur_syslog=$(perl -ne 'print $1 if /udp\s*\(\s*"(\S+)" /' $ETC/syslog-ng/syslog-ng.conf)
+export cur_relay=$(cat $postfix_conf | awk -F'= ' '/^relayhost/ {print $2}')
+
 log_msg "INFO: cur name: $cur_hostname.$cur_domain"
 log_msg "INFO: cur ip:   $cur_ip, gw: $cur_gw"
-log_msg "INFO: cur dns:  $cur_dns1, $cur_dns2"
-log_msg "INFO: cur ntp:  $cur_ntp1, $cur_ntp2"
-log_msg "INFO: cur log:  $cur_syslog"
+log_msg "INFO: cur dns:  $cur_dns"
+log_msg "INFO: cur ntp:  $cur_ntp"
+#log_msg "INFO: cur log:  $cur_syslog"
 log_msg "INFO: cur smtp: $cur_relay"
