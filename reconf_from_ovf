@@ -109,7 +109,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export netcfg_path="sysconfig/network-scripts"
   export hostname_conf="$ETC/hostname"
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
-  export route_conf="$ETC/$netcfg_path/route-$if0"
+  export route_conf=""
   export ntp_conf="$ETC/chrony.conf"
   export syslog_type="rsyslog"
   export syslog_conf=$ETC/rsyslog.conf
@@ -134,10 +134,11 @@ fi
 export old_hostname=$(cat $hostname_conf | cut -d. -f1)
 export old_domain=$(cat $hostname_conf | cut -d. -f2-)
 export old_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
-if [[ -e $route_conf ]]; then 
+# export old_gw=$(ip route show | perl -ne 'print $1 if /default via (\S+) dev \S+/')
+if [[ ! -z $route_conf ]]; then 
   export old_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
 else 
-  export old_gw=$(ip route show | perl -ne 'print $1 if /default via (\S+) dev \S+/')
+  export old_gw=$(cat $iface_conf | perl -ne 'print $2 if /GATEWAY=(\W?)([0-9.]+)/')
 fi
 # or perl -pe 'if(!eof){s/\n/,/}'
 export old_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
@@ -235,9 +236,13 @@ perl -pi -e 's/IPADDR=(\W?)[0-9.]+/IPADDR=\1$ENV{new_ip}/' $iface_conf
 ## change gateway: routes and and iface config 
 if [[ ! -z $new_gw && $new_gw != $old_gw ]]; then
   log_msg "NOTE: changing gateway address to $new_gw"
-  echo "default $new_gw - -" > $route_conf
-  # rlel/centos: also in iface config
-  perl -pi -e 's/^GATEWAY=.*/GATEWAY=$ENV{new_gw}/' $iface_conf
+  if [[ ! -z $route_conf ]]; then
+    # sles: separate file
+    echo "default $new_gw - -" > $route_conf
+  else
+    # rlel/centos: in iface config (file does not work)
+    perl -pi -e 's/^GATEWAY=.*/GATEWAY=$ENV{new_gw}/' $iface_conf
+  fi
 fi
 
 ## sshd
@@ -330,7 +335,11 @@ fi
 export cur_hostname=$(cat $hostname_conf | cut -d. -f1)
 export cur_domain=$(cat $hostname_conf | cut -d. -f2-)
 export cur_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
-export cur_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
+if [[ ! -z $route_conf ]]; then 
+  export cur_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
+else 
+  export cur_gw=$(cat $iface_conf | perl -ne 'print $2 if /GATEWAY=(\W?)([0-9.]+)/')
+fi
 export cur_dns=$(cat $resolv_conf | awk '/^nameserver / {print $2}' | paste -sd ',')
 export cur_ntp=$(cat $ntp_conf | awk '/^server / {print $2}' | paste -sd ',')
 if [[ $syslog_type == "syslog-ng" ]]; then
