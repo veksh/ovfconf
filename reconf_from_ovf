@@ -19,12 +19,12 @@ if [[ ! -z $1 ]]; then
   #PREFIX=$(pwd)
   PREFIX=.
   OVF_FILE=$PREFIX/ovfEnv.xml
-  LOG_FILE=$PREFIX/ovf_fix.log
+  LOG_FILE=$PREFIX/ovfconf.log
   ETC=$PREFIX/etc
 else
   # probably 
   OVF_FILE=/tmp/ovfEnv.xml
-  LOG_FILE=/tmp/ovf_fix.log
+  LOG_FILE=/tmp/ovfconf.log
   ETC=/etc 
 fi
 
@@ -40,7 +40,9 @@ fi
 log_msg() {
   local msg=$1
   echo "`date \"+%b %d %T\"` $msg"
-  echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
+  if [[ ! -z $LOG_FILE ]]; then
+    echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
+  fi
 }
 
 ## dump OVF from environment, return 0 on success, 1 if none found
