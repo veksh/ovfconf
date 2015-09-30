@@ -22,7 +22,7 @@ rc_reset
 case "$1" in
     start)
         # try reconf
-        /usr/local/sbin/reconf_from_ovf
+        /usr/local/sbin/ovfconf
 	;;
     stop|restart)
         # skip / nothing to do
