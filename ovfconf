@@ -117,6 +117,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export ntp_conf="$ETC/chrony.conf"
   export syslog_type="rsyslog"
   export syslog_conf=$ETC/rsyslog.conf
+  export ERASE_SSH_KEYS="check"
 fi
 
 if [[ -r "$ETC/SuSE-release" ]]; then
@@ -133,6 +134,7 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   export ntp_conf="$ETC/ntp.conf"
   export syslog_type="syslog-ng"
   export syslog_conf=$ETC/syslog-ng/rsyslog.conf
+  export ERASE_SSH_KEYS="yes"
 fi
 
 ## get current values
@@ -254,8 +256,18 @@ if [[ $(grep -c -E "ListenAddress $old_ip" $sshd_conf) != "0" ]]; then
   log_msg "INFO:  changing ip in sshd config"
   perl -pi -e 's/^ListenAddress .*/ListenAddress $ENV{new_ip}/' $sshd_conf
 fi
-log_msg "INFO: erasing ssh keys to rebuild them"
-rm $ETC/ssh/ssh_host_*
+if [[! -z $ERASE_SSH_KEYS && $ERASE_SSH_KEYS != 'no' ]]; then
+  log_msg "INFO: erasing ssh keys to rebuild them"
+  if [[ $ERASE_SSH_KEYS == "check" ]]; then
+    # centos 7 does not re-generate dsa key by default (and connect failed with
+    # "no hostkey alg"); check for non-default settings in /etc/sysconfig/sshd 
+    if [[ $(grep -c '^AUTOCREATE' /etc/sysconfig/sshd) == 1 ]]; then
+      rm $ETC/ssh/ssh_host_*_key*
+    fi
+  else
+    rm $ETC/ssh/ssh_host_*_key*
+  fi
+fi
 
 ## nrpe
 if [[ -r $nrpe_conf && $(grep -c -E "server_address=$old_ip" $nrpe_conf) != "0" ]]; then

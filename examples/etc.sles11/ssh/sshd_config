@@ -16,7 +16,7 @@
 #ListenAddress ::
 
 # disabled to simplify cloning
-ListenAddress 10.0.150.110
+#ListenAddress 10.0.150.110
 
 # The default requires explicit activation of protocol 1
 #Protocol 2
@@ -45,7 +45,7 @@ PermitRootLogin no
 #StrictModes yes
 #MaxAuthTries 6
 #MaxSessions 10
-AllowGroups wheel backup
+AllowGroups wheel backup web-dev
 
 #RSAAuthentication yes
 #PubkeyAuthentication yes
