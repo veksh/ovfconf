@@ -2,7 +2,7 @@
 Description=Service for automatic network configuration based on OVF environment
 After=vmtoolsd.service syslog.target
 Wants=network-pre.target
-Before=network-pre.target
+Before=network-pre.target sshd-keygen.service
 ConditionVirtualization=vmware
 
 [Service]
