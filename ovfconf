@@ -112,7 +112,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   fi
   export netcfg_path="sysconfig/network-scripts"
   export hostname_conf="$ETC/hostname"
-  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'print $1 if /ifcfg-(?!lo)(\S+)/' | head -1)
+  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'if (/ifcfg-(?!lo)(\S+)/) {print $1; exit 0}')
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf=""
   export ntp_conf="$ETC/chrony.conf"
@@ -130,7 +130,7 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   fi
   export netcfg_path="sysconfig/network"
   export hostname_conf="$ETC/HOSTNAME"
-  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'print $1 if /ifcfg-(?!lo)(\S+)/' | head -1)
+  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'if (/ifcfg-(?!lo)(\S+)/) {print $1; exit 0}')
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf="$ETC/$netcfg_path/routes"
   export ntp_conf="$ETC/ntp.conf"
