@@ -1,0 +1,1 @@
+rm -rf etc/ && cp -r ../examples/etc.sles11/ etc/ && ../ovfconf centos71-copy.test.xml 

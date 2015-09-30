@@ -1,0 +1,5 @@
+rm -rf etc
+cp -r ../examples/etc.centos7/ etc/ 
+../ovfconf centos71-ekat.test.xml 
+diff -r ../examples/etc.centos7/ etc/
+

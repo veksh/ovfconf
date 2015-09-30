@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Environment
+     xmlns="http://schemas.dmtf.org/ovf/environment/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:oe="http://schemas.dmtf.org/ovf/environment/1"
+     xmlns:ve="http://www.vmware.com/schema/ovfenv"
+     oe:id=""
+     ve:vCenterId="vm-134">
+   <PlatformSection>
+      <Kind>VMware ESXi</Kind>
+      <Version>5.1.0</Version>
+      <Vendor>VMware, Inc.</Vendor>
+      <Locale>en</Locale>
+   </PlatformSection>
+   <PropertySection>
+         <Property oe:key="dns" oe:value="10.0.128.1,10.0.128.2"/>
+         <Property oe:key="domain" oe:value="m0.maxidom.ru"/>
+         <Property oe:key="gateway" oe:value="10.0.150.254"/>
+         <Property oe:key="hostname" oe:value="centos71-copy"/>
+         <Property oe:key="ip" oe:value="10.0.150.72"/>
+         <Property oe:key="ntp" oe:value="ntp1.m0.maxidom.ru, ntp2.m0.maxidom.ru"/>
+         <Property oe:key="relay" oe:value="smtp.m0.maxidom.ru"/>
+         <Property oe:key="syslog" oe:value="log.m0.maxidom.ru"/>
+   </PropertySection>
+   <ve:EthernetAdapterSection>
+      <ve:Adapter ve:mac="00:50:56:90:ad:5e" ve:network="adm-vm" ve:unitNumber="7"/>
+   </ve:EthernetAdapterSection>
+</Environment>
