@@ -4,20 +4,29 @@ Tool for Linux guest VM customization based on vmware OVF environment (vApp prop
 
 # Overview
 
-OVF Environment: see William Lam [introduction][lam-ovf-environment]
+OVF Environment is a way to pass some metadata like IP address to guest VM while deploying
+it from OVF template (see [OVF specification][ovf-spec] and William Lam
+[introduction][lam-ovf-environment] for details).
 
 Unfortunately, there is no common way to utilize this fine mechanism to provide VM images
 with self-configuration abilities (vmware implement one in VCenter Appliance OVF image as
 `/etc/init.d/vaos`, but this implementation is somewhat hard to reuse and has too many
 external dependences). This simple tool developed to fill this void.
 
+[ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
 [lam-ovf-environment]: http://www.virtuallyghetto.com/2012/06/ovf-runtime-environment.html
 
-# Features
+# Mode of operation and affected files
 
-Script is intended to be run at system startup and re-configure freshly deployed image and
-set new hostname and IP address (assuming same subnet and domain). Other optionally
-configurable parameters include:
+Script is itended to be run at system startup to re-configure freshly deployed image or
+clone. After getting data on OVF environment and some performing some sanity checks, it
+looks for hostname change (and does nothing if name is not changed). New hostname and IP
+address are set in interface configurtion, hosts file, hostname config file and in some
+other configs (sshd, nrpe, passwd and syslog-ng if present), ssh host keys are erased (to
+be automatically generated again) and so clone is fully configured at the end of boot
+process.
+
+Other optionally configurable parameters include:
 - gateway address
 - DNS domain
 - DNS servers
@@ -51,6 +60,10 @@ There are no requirements except perl, open-vm-tools (classic Vmware Tools will 
 and usual system tools like `sed`.
 
 # Usage modes
+
+## Cloning VMs in vCenter
+
+## Deploying OVF templates or cloning VMs with ovftool
 
 ## Injecting OVF environment inside VM config file
 
@@ -111,11 +124,8 @@ performing required changes in OS config.
 - untested on redhat/centos 6.x, sles 12 etc
 - only some hard-coded apps and services are supported
 - has some assumptions about configuraton file formats
+- configuration parametrs (like log file name) are hard-coded too
 
 # Caveats
 
 - redhat/centos: better enable DSA key generation in /etc/sysconfig/sshd
-
-# Further ideas
-
-- Separate configuration file with options like log location
