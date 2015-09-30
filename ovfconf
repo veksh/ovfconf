@@ -98,7 +98,8 @@ export resolv_conf="$ETC/resolv.conf"
 export postfix_conf="$ETC/postfix/main.cf"
 export sshd_conf="$ETC/ssh/sshd_config"
 export nrpe_conf="$ETC/nagios/nrpe.cfg"
-export if0=$(ip route show | perl -ne 'print $1 if /default via \S+ dev (\S+)/')
+#export if0=$(ip route show | perl -ne 'print $1 if /default via \S+ dev (\S+)/')
+#export if0=ens160
 # also: affects /etc/hosts, /etc/passwd
 
 ## platform and version specific
@@ -110,6 +111,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   fi
   export netcfg_path="sysconfig/network-scripts"
   export hostname_conf="$ETC/hostname"
+  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'print $1 if /ifcfg-(?!lo)(\S+)/' | head -1)
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf=""
   export ntp_conf="$ETC/chrony.conf"
@@ -125,6 +127,7 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   fi
   export netcfg_path="sysconfig/network"
   export hostname_conf="$ETC/HOSTNAME"
+  export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'print $1 if /ifcfg-(?!lo)(\S+)/' | head -1)
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf="$ETC/$netcfg_path/routes"
   export ntp_conf="$ETC/ntp.conf"
@@ -136,7 +139,6 @@ fi
 export old_hostname=$(cat $hostname_conf | cut -d. -f1)
 export old_domain=$(cat $hostname_conf | cut -d. -f2-)
 export old_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
-# export old_gw=$(ip route show | perl -ne 'print $1 if /default via (\S+) dev \S+/')
 if [[ ! -z $route_conf ]]; then 
   export old_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
 else 
