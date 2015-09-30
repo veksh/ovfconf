@@ -28,8 +28,9 @@ else
   ETC=/etc 
 fi
 
-# check for this suffix if set
-CHECK_DOMAIN_SUFFIX=maxidom.ru
+# check that new domain is ending with with suffix, if set
+#CHECK_DOMAIN_SUFFIX=maxidom.ru
+CHECK_DOMAIN_SUFFIX=
 
 # rpctool binary: new from open-vm-tools, fallback to classic if not found
 RPCTOOL=/usr/bin/vmware-rpctool
@@ -194,6 +195,11 @@ if [[ $new_ip == $old_ip ]]; then
   log_msg "ERROR: new ip is same as old ($new_ip), exiting"
   exit 1
 fi
+
+# some exception for our domain
+if [[ $(echo $old_domain | grep -c -i maxidom) == 1 ]]; then
+  export CHECK_DOMAIN_SUFFIX="maxidom.ru"
+end
 
 if [[ ! -z $CHECK_DOMAIN_SUFFIX && ! -z $new_domain ]]; then
   if [[ $(echo "$new_domain" | grep -c -E "$CHECK_DOMAIN_SUFFIX$") == "0" ]]; then
