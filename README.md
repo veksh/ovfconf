@@ -1,17 +1,16 @@
 # ovfconf
 
-This simple script allows to customize VMs (deployed from OVF template or cloned in
-vCenter) with new hostname and network address, and optionally reconfigure software after
-address change.
+Simple script to customize VM clones (or OVF template deployments) with new network
+settings taken from OVF/vApp metadata
 
 # Overview
 
 OVF Environment is a way to pass arbitrary data to guest VM on power on, widely used to
 customize network parameters while deploying OVF templates. In form of "vApp properties"
-it could be used to customize VM metadata and pass it from vCenter to VM at startup, and
-this script using that for OS customization. Script is short, relatively easy to extend
-and not have external dependences like XML parsers, making it easy to integrate it in
-golden VM templates or OVF images.
+it could be also used to customize VM metadata in vCenter and to pass it to VM at startup.
+This script reads that metadata and updates OS configuration on change. Script is short,
+relatively easy to extend and not have external dependences like XML parsers, making it
+easy to integrate it in golden VM templates or OVF images.
 
 See [OVF specification][ovf-spec] and William Lam [blog][lam-ovf-environment] for further
 details about OVF Environment, and VMware [blog][vmware-ovf-blog] for some earlier
@@ -48,6 +47,9 @@ Script is tested on Suse Linux Enterprise 11.x and CentOS 7.1 (and will refuse t
 elsewhere) under VMWare ESXi 5.5 hypervisor. Changes to adapt it to other platforms will
 be minimal, and there is a special "test" mode to check effects on copy of "/etc" (see
 source and "test" directory).
+
+It is safe to run this script at every startup: if environment is not changed (or not
+available for some reason) no changes are performed.
 
 # Installation
 
