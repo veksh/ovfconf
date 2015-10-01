@@ -1,19 +1,19 @@
 # ovfconf
 
-Tool for Linux guest VM customization based on vmware OVF environment (vApp properties)
+Tool for Linux guest VM customization based on vmware OVF environment (vApp properties).
 
 (documentation is work-in-progress, hope to finish it soon)
 
 # Overview
 
-OVF Environment is a way to pass some metadata like IP address to guest VM while deploying
-it from OVF template (see [OVF specification][ovf-spec] and William Lam
-[introduction][lam-ovf-environment] for details).
+OVF Environment is a way to pass arbitrary data to guest VM while deploying it from OVF
+template, most useful are hostname and IP address (see [OVF specification][ovf-spec] and
+William Lam [introduction][lam-ovf-environment] for details). In form of "vApp properties"
+it could be used to pass data from vCenter to VM at startup.
 
-Unfortunately, there is no common way to utilize this fine mechanism to provide VM images
-with self-configuration abilities (vmware implement one in VCenter Appliance OVF image as
-`/etc/init.d/vaos`, but this implementation is somewhat hard to reuse and has too many
-external dependences). This simple tool developed to fill this void.
+This simple script allows to customize VMs deployed from OVF template or by cloning by
+manually assigning host configuration parameters and reconfigure software after address
+change.
 
 [ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
 [lam-ovf-environment]: http://www.virtuallyghetto.com/2012/06/ovf-runtime-environment.html
@@ -21,20 +21,24 @@ external dependences). This simple tool developed to fill this void.
 # Mode of operation and affected files
 
 Script is itended to be run at system startup to re-configure freshly deployed image or
-clone. After getting data on OVF environment and some performing some sanity checks, it
-looks for hostname change (and does nothing if name is not changed). New hostname and IP
-address are set in interface configurtion, hosts file, hostname config file and in some
-other configs (sshd, nrpe, passwd and syslog-ng if present), ssh host keys are erased (to
-be automatically generated again) and so clone is fully configured at the end of boot
-process.
+clone. After getting data from OVF environment it checks for hostname and IP address
+change. If changed, new IP address and host name are set in
+- interface configuration file
+- hosts file
+- hostname config file
+- "root" user description in `/etc/passwd`
+- some application configs (sshd, nrpe, syslog-ng)
 
-Other optionally configurable parameters include:
+Other optionally configurable vApp parameters include:
 - gateway address
 - DNS domain
 - DNS servers
 - NTP servers (ntpd and chrony are supported)
 - remote syslog server address (syslog-ng and rsyslogd are supported)
 - smarthost SMTP server address (for postfix)
+
+Finally, ssh host keys are erased (to be automatically regenerated for new host) and so
+clone is fully configured at the end of boot process.
 
 Script is tested on Suse Linux Enterprise 11.x and CentOS 7.1 (and will refuse to run
 elsewhere) under VMWare ESXi 5.5 hypervisor. Changes to adapt it to other platforms will
