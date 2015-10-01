@@ -1,21 +1,25 @@
 # ovfconf
 
-This simple script allows to customize VMs deployed from OVF template or by cloning by
-manually assigning host configuration parameters and reconfigure software after address
-change.
+This simple script allows to customize VMs (deployed from OVF template or cloned in
+vCenter) with new hostname and network address, and optionally reconfigure software after
+address change.
 
 # Overview
 
-OVF Environment is a way to pass arbitrary data to guest VM while deploying it from OVF
-template, most useful are hostname and IP address (see [OVF specification][ovf-spec] and
-William Lam [introduction][lam-ovf-environment] for details). In form of "vApp properties"
-it could be used to pass data from vCenter to VM at startup, and both forms are used to
-customize application properties while deploying or cloning. This script is quick
-implementation of base OS customization without external dependences like XML parsers,
-easily integrated in golden VM templates of OVF images.
+OVF Environment is a way to pass arbitrary data to guest VM on power on, widely used to
+customize network parameters while deploying OVF templates. In form of "vApp properties"
+it could be used to customize VM metadata and pass it from vCenter to VM at startup. This
+script is quick implementation of arbitrary OS customization. It is relatively easy to fix
+and extend and does not have external dependences like XML parsers, making it easy to
+integrate it in golden VM templates or OVF images.
+
+See [OVF specification][ovf-spec] and William Lam [blog][lam-ovf-environment] for further
+details about OVF Environment, and old VMware [blog][vmware-ovf-blog] for some earlier
+example of OS customization script.
 
 [ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
 [lam-ovf-environment]: http://www.virtuallyghetto.com/2012/06/ovf-runtime-environment.html
+[vmware-ovf-blog]: http://blogs.vmware.com/vapp/2009/07/selfconfiguration-and-the-ovf-environment.html
 
 # Mode of operation and configuration changes
 
@@ -71,7 +75,7 @@ and usual system tools like `sed`.
 
 To simplify cloning between data centers, "network profile" could be assigned to main VM
 administrative network (later referred as "adm-vm"). Settings for subnet mask, gateway,
-DNS servers could be inherited from that profile. To configure it, go to "Networking"
+DNS servers could be obtained from that profile. To configure it, go to "Networking"
 section of vCenter administrative interface, select "adm-vm" and associate network profile
 with it with multi-step wizard:
 - name: "adm-vm ip profile"
@@ -162,6 +166,7 @@ Deploying OVF to standalone ESXi host with "ovftool" is not reliable: even with
 `--X:injectOvfEnv --powerOn` it sometimes fail to actually pass OVF info. This could be
 worked around with injecting OVF info directly into VM config (I've found with idea in
 William Lam [blog post][lam-ovf-injection]). Basically, one must
+- clone VM somehow (by physical copy or with ovftool), perform basic customization
 - prepare XML file (see "Technical Details" section for format description and example)
 - convert it to one long line by escaping double-quote to "|22", newline to "|0A":
 
