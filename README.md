@@ -8,12 +8,12 @@ settings taken from OVF/vApp metadata
 OVF Environment is a way to pass arbitrary data to guest VM on power on, widely used to
 customize network parameters while deploying OVF templates. In form of "vApp properties"
 it could be also used to customize VM metadata in vCenter and to pass it to VM at startup.
-This script reads that metadata and updates OS configuration on change. Script is short,
+This script reads that metadata and updates OS configuration if required. Script is short,
 relatively easy to extend and not have external dependences like XML parsers, making it
 easy to integrate it in golden VM templates or OVF images.
 
 See [OVF specification][ovf-spec] and William Lam [blog][lam-ovf-environment] for further
-details about OVF Environment, and VMware [blog][vmware-ovf-blog] for some earlier
+details about OVF Environment, and VMware [blog post][vmware-ovf-blog] for some earlier
 example of OS customization script.
 
 [ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
@@ -23,7 +23,7 @@ example of OS customization script.
 # Mode of operation and configuration changes
 
 Script is intended to be run at system startup to re-configure freshly deployed image or
-clone (but could be run later manually or be used in test mode, see below). After getting
+clone (but could be run later manually or be tried in test mode, see below). After getting
 data from OVF environment it checks for hostname and IP address change. If changed, new IP
 address and host name are set in
 - interface configuration file
@@ -97,22 +97,22 @@ last page ("vApp options"), enable them. Proceed to create metadata as follows (
 forget to specify current values as defaults, or VM will be reconfigured at startup):
 - Ensure ip allocation policy = "manual"
 - Expand "Properties", add our props (set "Category" and "Label", do not change rest)
-    - Category "name": mandatory
-        - "hostname": static "String" 3-30, default: current hostname
-        - "domain": static "String" 5-50, default: current DNS domain name
+    - Category `name`: mandatory
+        - `hostname`: static "String" 3-30, default: current hostname
+        - `domain`: static "String" 5-50, default: current DNS domain name
            - or dynamic "Domain name" from "adm-vm" network
-    - Category "address": mandatory
-        - "ip": static "vApp IP address" in "adm-vm", default: current IP
-        - "gateway", dynamic "Gateway from adm-vm" or static "vApp IP address" in
+    - Category `address`: mandatory
+        - `ip`: static "vApp IP address" in "adm-vm", default: current IP
+        - `gateway`: dynamic "Gateway from adm-vm" or static "vApp IP address" in
           "adm-vm", default: current GW
-    - Category "services": optional; will be kept untouched if not used
-        - "dns": dynamic "DNS servers" from "adm-vm"
-        - "ntp": static String 5-50, default: current NTP servers, comma-separated
+    - Category `services`: optional; will be kept untouched if not used
+        - `dns`: dynamic "DNS servers" from "adm-vm"
+        - `ntp`: static String 5-50, default: current NTP servers, comma-separated
            (there is no ntp property in network profile)
-        - "syslog": static String 5-30, default: current syslog server IP or name
+        - `syslog`: static String 5-30, default: current syslog server IP or name
             - "External IP Address" would be better, but there is no "default value" field
               for it in 5.5 for some reason
-        - "relay": static String 5-50, default: current smarthost
+        - `relay`: static String 5-50, default: current smarthost
 - "IP Allocation": scheme "OVF environment", "IPv4"
 - "Autoring"/"OVF Environment transport": check "VMware Tools"
 
