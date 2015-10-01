@@ -8,13 +8,13 @@ address change.
 
 OVF Environment is a way to pass arbitrary data to guest VM on power on, widely used to
 customize network parameters while deploying OVF templates. In form of "vApp properties"
-it could be used to customize VM metadata and pass it from vCenter to VM at startup. This
-script is quick implementation of arbitrary OS customization. It is relatively easy to fix
-and extend and does not have external dependences like XML parsers, making it easy to
-integrate it in golden VM templates or OVF images.
+it could be used to customize VM metadata and pass it from vCenter to VM at startup, and
+this script using that for OS customization. Script is short, relatively easy to extend
+and not have external dependences like XML parsers, making it easy to integrate it in
+golden VM templates or OVF images.
 
 See [OVF specification][ovf-spec] and William Lam [blog][lam-ovf-environment] for further
-details about OVF Environment, and old VMware [blog][vmware-ovf-blog] for some earlier
+details about OVF Environment, and VMware [blog][vmware-ovf-blog] for some earlier
 example of OS customization script.
 
 [ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
@@ -34,7 +34,7 @@ address and host name are set in
 - some application configs (sshd, nrpe, syslog-ng)
 
 Other optionally configurable vApp parameters include:
-- gateway address
+- gateway IP address
 - DNS domain
 - DNS servers
 - NTP servers (ntpd and chrony are supported)
@@ -123,13 +123,14 @@ template requires a bit of manual customization, but most things work.
 ## General preparation
 
 Better power off VM before cloning. If "host file" is connected to CD-ROM disconnect it
-before cloning or copy of this file will be created.
+before cloning or copy of this file will be created. Better enable DSA key generation in
+`/etc/sysconfig/sshd` or older ssh clients will be unable to connect.
 
 ## Cloning VMs in vCenter
 
 Clone machine as usual, do not opt for "customize OS". On step 1e ("Customize vApp
-properties"), enter new host name and IP address (rest of params could be kept as is if
-cloning into same network). Review configuration and power on VM.
+properties"), enter new host name and IP address (and rest of params if moving to other
+domain or network). Review configuration and power on VM.
 
 If everything worked as expected, new IP address will be assigned and visible in vCenter
 shortly after boot. If something is amiss, VM will probably boot with old IP address and
@@ -162,15 +163,24 @@ symbols that require HTML escaping, so try to use alphanumeric passwords ("-" is
 
 ## Injecting OVF environment inside VM config file
 
-Deploying OVF to standalone ESXi host with "ovftool" is not reliable: even with
+Deploying OVF to standalone ESXi host with `ovftool` is not reliable: even with
 `--X:injectOvfEnv --powerOn` it sometimes fail to actually pass OVF info. This could be
-worked around with injecting OVF info directly into VM config (I've found with idea in
-William Lam [blog post][lam-ovf-injection]). Basically, one must
-- clone VM somehow (by physical copy or with ovftool), perform basic customization
+worked around with injecting OVF directly into VM config (I've found with idea in William
+Lam [blog post][lam-ovf-injection]). Basically, one must
+- clone VM somehow (`ovftool` is easiest way)
+
+        ovftool --name=newvm \
+          --X:logLevel=verbose --X:logFile=newvm.log \
+          --datastore=host2-ds1 --diskMode=thin \
+          --network=adm-srv \
+          vi://root@oldhost/template-vm \
+          vi://root@newhost/
+
+- perform basic customization like enabling VNC console (just in case)
 - prepare XML file (see "Technical Details" section for format description and example)
 - convert it to one long line by escaping double-quote to "|22", newline to "|0A":
 
-        cat ovfEnv.falcon-e1.xml | perl -ane '$_ =~ s/"/|22/g; $_ =~ s/\n/|0A/g; print'
+        cat ovfEnv.newvm.xml | perl -ane '$_ =~ s/"/|22/g; $_ =~ s/\n/|0A/g; print'
 
 - add `guestinfo.ovfEnv = "<that blob">` into `<vm>.vmx`
 - `vim-cmd vmsvc/reload <vm>` and start VM
@@ -225,8 +235,3 @@ a template for customization or as debugging aid), log of activity is in `/tmp/o
 - only some hard-coded apps and services are supported
 - has some assumptions about configuraton file formats
 - configuration parametrs (like log file name) are hard-coded too
-
-# Caveats and tips
-
-- redhat/centos: better enable DSA key generation in /etc/sysconfig/sshd or older ssh
-  clients will be unable to connect
