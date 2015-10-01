@@ -1,9 +1,9 @@
 #! /bin/sh
 #
-# /etc/init.d/boot.ovfenv
+# /etc/init.d/boot.ovfconf
 #
 ### BEGIN INIT INFO
-# Provides:          boot.ovfenv
+# Provides:          boot.ovfconf
 # Required-Start:    boot.rootfsck boot.localfs
 # Should-Start:      $local_fs
 # Required-Stop:     $null
