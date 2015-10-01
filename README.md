@@ -1,28 +1,28 @@
 # ovfconf
 
-Tool for Linux guest VM customization based on vmware OVF environment (vApp properties).
-
-(documentation is work-in-progress, hope to finish it soon)
+This simple script allows to customize VMs deployed from OVF template or by cloning by
+manually assigning host configuration parameters and reconfigure software after address
+change.
 
 # Overview
 
 OVF Environment is a way to pass arbitrary data to guest VM while deploying it from OVF
 template, most useful are hostname and IP address (see [OVF specification][ovf-spec] and
 William Lam [introduction][lam-ovf-environment] for details). In form of "vApp properties"
-it could be used to pass data from vCenter to VM at startup.
-
-This simple script allows to customize VMs deployed from OVF template or by cloning by
-manually assigning host configuration parameters and reconfigure software after address
-change.
+it could be used to pass data from vCenter to VM at startup, and both forms are used to
+customize application properties while deploying or cloning. This script is quick
+implementation of base OS customization without external dependences like XML parsers,
+easily integrated in golden VM templates of OVF images.
 
 [ovf-spec]: http://dmtf.org/sites/default/files/standards/documents/DSP0243_1.1.1.pdf
 [lam-ovf-environment]: http://www.virtuallyghetto.com/2012/06/ovf-runtime-environment.html
 
-# Mode of operation and affected files
+# Mode of operation and configuration changes
 
-Script is itended to be run at system startup to re-configure freshly deployed image or
-clone. After getting data from OVF environment it checks for hostname and IP address
-change. If changed, new IP address and host name are set in
+Script is intended to be run at system startup to re-configure freshly deployed image or
+clone (but could be run later manually or be used in test mode, see below). After getting
+data from OVF environment it checks for hostname and IP address change. If changed, new IP
+address and host name are set in
 - interface configuration file
 - hosts file
 - hostname config file
@@ -62,14 +62,99 @@ Just copy `ovfconf` script to `/usr/local/sbin` and install startup scripts.
 
 Example RPM spec for SLES 11 is also provided.
 
-There are no requirements except perl, open-vm-tools (classic Vmware Tools will do too)
+There are no requirements except `perl`, `open-vm-tools` (classic Vmware Tools will do too)
 and usual system tools like `sed`.
 
-# Usage modes
+# VM and vCenter configuration
+
+## vCenter: optional network profile
+
+To simplify cloning between data centers, "network profile" could be assigned to main VM
+administrative network (later referred as "adm-vm"). Settings for subnet mask, gateway,
+DNS servers could be inherited from that profile. To configure it, go to "Networking"
+section of vCenter administrative interface, select "adm-vm" and associate network profile
+with it with multi-step wizard:
+- name: "adm-vm ip profile"
+- configure subnet and gateway, no DHCP, configure DNS server addresses, no ip pool
+    - dns is specified as "10.0.128.1, 10.0.128.2" but passed w/o space in OVF env
+    - possible separators are comma, semicolon on space
+- skip ipv6
+- configure DNS domain, no host prefix, search domain is same as, no proxy
+
+After that, some properties like "gateway" could be replaced with their "dynamic"
+versions: instead of "static String" dynamic "Gateway from <net>" could be used.
+
+## vApp properties
+
+Configure properties metadata for vApp before cloning: on VM settings in vCenter go to
+last page ("vApp options"), enable them. Proceed to create metadata as follows (do not
+forget to specify current values as defaults, or VM will be reconfigured at startup):
+- Ensure ip allocation policy = "manual"
+- Expand "Properties", add our props (set "Category" and "Label", do not change rest)
+    - Category "name": mandatory
+        - "hostname": static "String" 3-30, default: current hostname
+        - "domain": static "String" 5-50, default: current DNS domain name
+           - or dynamic "Domain name" from "adm-vm" network
+    - Category "address": mandatory
+        - "ip": static "vApp IP address" in "adm-vm", default: current IP
+        - "gateway", dynamic "Gateway from adm-vm" or static "vApp IP address" in
+          "adm-vm", default: current GW
+    - Category "services": optional; will be kept untouched if not used
+        - "dns": dynamic "DNS servers" from "adm-vm"
+        - "ntp": static String 5-50, default: current NTP servers, comma-separated
+           (there is no ntp property in network profile)
+        - "syslog": static String 5-30, default: current syslog server IP or name
+            - "External IP Address" would be better, but there is no "default value" field
+              for it in 5.5 for some reason
+        - "relay": static String 5-50, default: current smarthost
+- "IP Allocation": scheme "OVF environment", "IPv4"
+- "Autoring"/"OVF Environment transport": check "VMware Tools"
+
+Manual creation of properties in OVF template is possible too, but usually it is easier to
+configure them in vCenter and export template with `ovftool` (see below). Usually exported
+template requires a bit of manual customization, but most things work.
+
+# VM deployment scenarios
+
+## General preparation
+
+Better power off VM before cloning. If "host file" is connected to CD-ROM disconnect it
+before cloning or copy of this file will be created.
 
 ## Cloning VMs in vCenter
 
+Clone machine as usual, do not opt for "customize OS". On step 1e ("Customize vApp
+properties"), enter new host name and IP address (rest of params could be kept as is if
+cloning into same network). Review configuration and power on VM.
+
+If everything worked as expected, new IP address will be assigned and visible in vCenter
+shortly after boot. If something is amiss, VM will probably boot with old IP address and
+hostname (as exact copy of original), investigate log (`/tmp/ovfconf.log`) and retry.
+
 ## Deploying OVF templates or cloning VMs with ovftool
+
+[`ovftool`][ovf-tool-doc] is command-line utility to work with VM images (not limited to
+OVF templates). It could be used to export VM to OVF image and import it again, and also
+to clone VMs, extract metadata and so on (see documentation for details), like this:
+- preview VM metadata and properties
+
+        ovftool vi://<user>@<vca>/<datacenter>/vm/<vm-name>
+
+- clone VM from one vCenter to another: only hostname and ip specified, rest of properties
+  assumed to be same (or come from network profile)
+
+        ovftool --name=new-vm \
+          --datastore=host-storage1 --diskMode=thin \
+          --network=adm-vm \
+          --prop:"hostname=new-vm" \
+          --prop:"ip=1.2.3.4" \
+          vi://user@vca1/dc1/vm/template-vm \
+          vi://alex@vca2/dc2/host/newhost.domain.com
+
+One small caveat: `ovftool` does not work correctly when password contains special
+symbols that require HTML escaping, so try to use alphanumeric passwords ("-" is ok too).
+
+[ovf-tool-doc]: https://www.vmware.com/support/developer/ovf/
 
 ## Injecting OVF environment inside VM config file
 
@@ -77,7 +162,7 @@ Deploying OVF to standalone ESXi host with "ovftool" is not reliable: even with
 `--X:injectOvfEnv --powerOn` it sometimes fail to actually pass OVF info. This could be
 worked around with injecting OVF info directly into VM config (I've found with idea in
 William Lam [blog post][lam-ovf-injection]). Basically, one must
-- prepare XML file (see "Technical Details" section for format description)
+- prepare XML file (see "Technical Details" section for format description and example)
 - convert it to one long line by escaping double-quote to "|22", newline to "|0A":
 
         cat ovfEnv.falcon-e1.xml | perl -ane '$_ =~ s/"/|22/g; $_ =~ s/\n/|0A/g; print'
@@ -87,7 +172,7 @@ William Lam [blog post][lam-ovf-injection]). Basically, one must
 
 [lam-ovf-injection]: http://www.virtuallyghetto.com/2014/06/an-alternate-way-to-inject-ovf-properties-when-deploying-virtual-appliances-directly-onto-esxi.html
 
-# Technical details on operation
+# Technical details on operation, XML data format
 
 To get OVF environment from hypervisor script calls `vmware-rpctool 'info-get
 guestinfo.ovfEnv'` producing XML like
@@ -121,17 +206,22 @@ guestinfo.ovfEnv'` producing XML like
        </ve:EthernetAdapterSection>
     </Environment>
 
-Values for configuration parameters then extracted and compared with current ones,
-performing required changes in OS config.
+Values for configuration parameters are then extracted and compared with current settings,
+and configs are changed when necessary.
+
+On every boot copy of that XML will be created in `/tmp/ovfEnv.xml` (this could be used as
+a template for customization or as debugging aid), log of activity is in `/tmp/ovfconf.log`.
 
 # Limitations
 
-- no ipv6 support, only one interface is supported
+- only one interface is supported
+- no ipv6 support
 - untested on redhat/centos 6.x, sles 12 etc
 - only some hard-coded apps and services are supported
 - has some assumptions about configuraton file formats
 - configuration parametrs (like log file name) are hard-coded too
 
-# Caveats
+# Caveats and tips
 
-- redhat/centos: better enable DSA key generation in /etc/sysconfig/sshd
+- redhat/centos: better enable DSA key generation in /etc/sysconfig/sshd or older ssh
+  clients will be unable to connect
