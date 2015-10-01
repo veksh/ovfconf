@@ -2,6 +2,8 @@
 
 Tool for Linux guest VM customization based on vmware OVF environment (vApp properties)
 
+(documentation is work-in-progress, hope to finish it soon)
+
 # Overview
 
 OVF Environment is a way to pass some metadata like IP address to guest VM while deploying
