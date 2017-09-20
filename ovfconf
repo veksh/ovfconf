@@ -28,7 +28,7 @@ else
   ETC=/etc 
 fi
 
-# check that new domain is ending with with suffix, if set
+# check for this suffix if set
 #CHECK_DOMAIN_SUFFIX=maxidom.ru
 CHECK_DOMAIN_SUFFIX=
 
@@ -120,6 +120,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export syslog_type="rsyslog"
   export syslog_conf=$ETC/rsyslog.conf
   export ERASE_SSH_KEYS="check"
+  export CLEAN_IFACE_MAC="yes"
 fi
 
 if [[ -r "$ETC/SuSE-release" ]]; then
@@ -138,6 +139,7 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   export syslog_type="syslog-ng"
   export syslog_conf=$ETC/syslog-ng/syslog-ng.conf
   export ERASE_SSH_KEYS="yes"
+  export CLEAN_IFACE_MAC="no"
 fi
 
 ## get current values
@@ -158,6 +160,7 @@ if [[ $syslog_type == "syslog-ng" ]]; then
 else
   export old_syslog=$(perl -ne 'print $1 if /^[^#].* \@([^:]+):/'  $syslog_conf)
 fi
+export old_iface_mac=$(awk -F= '/HWADDR/ {print $2}' $iface_conf)
 
 ## check for mandatory params
 if [[ "X$old_hostname" == "X" || "X$old_ip" == "X" ]]; then
@@ -196,8 +199,8 @@ if [[ $new_ip == $old_ip ]]; then
   exit 1
 fi
 
-# some exception for our domain
-if [[ $(echo $old_domain | grep -c -i maxidom) == 1 ]]; then
+## if old domain is ours (maxidom.ru), check new anyway :)
+if [[ -z $CHECK_DOMAIN_SUFFIX && $(echo $old_domain | grep -c -i maxidom) == 1 ]]; then
   export CHECK_DOMAIN_SUFFIX="maxidom.ru"
 end
 
@@ -247,6 +250,11 @@ perl -pi -e 's/^root:x:0:0:[^:]+:/root:x:0:0:root\@$ENV{new_hostname}:/' $ETC/pa
 log_msg "NOTE: chainging main ip to $new_ip"
 log_msg "INFO:  changing $if0 config"
 perl -pi -e 's/IPADDR=(\W?)[0-9.]+/IPADDR=\1$ENV{new_ip}/' $iface_conf
+if [[ ! -z $CLEAN_IFACE_MAC && $CLEAN_IFACE_MAC == "yes" && ! -z $old_iface_mac ]]; then
+  # new is present in ovf EthernetAdapterSection, but lets clean it
+  log_msg "INFO:  cleaning old MAC from iface config"
+  perl -ni -e 'print unless /^HWADDR/' $iface_conf
+fi
 
 ## change gateway: routes and and iface config 
 if [[ ! -z $new_gw && $new_gw != $old_gw ]]; then
