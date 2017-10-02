@@ -202,7 +202,7 @@ fi
 ## if old domain is ours (maxidom.ru), check new anyway :)
 if [[ -z $CHECK_DOMAIN_SUFFIX && $(echo $old_domain | grep -c -i maxidom) == 1 ]]; then
   export CHECK_DOMAIN_SUFFIX="maxidom.ru"
-end
+fi
 
 if [[ ! -z $CHECK_DOMAIN_SUFFIX && ! -z $new_domain ]]; then
   if [[ $(echo "$new_domain" | grep -c -E "$CHECK_DOMAIN_SUFFIX$") == "0" ]]; then
