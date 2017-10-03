@@ -92,13 +92,6 @@ fi
 rm $LOG_FILE >/dev/null 2>&1
 touch $LOG_FILE
 
-## get env
-get_ovf_xml $1
-if [[ $? == 1 ]]; then
-  rm $LOG_FILE
-  exit 0
-fi
-
 ## common settings
 export resolv_conf="$ETC/resolv.conf"
 export postfix_conf="$ETC/postfix/main.cf"
@@ -173,6 +166,13 @@ export old_iface_mac=$(awk -F= '/HWADDR/ {print $2}' $iface_conf)
 if [[ "X$old_hostname" == "X" || "X$old_ip" == "X" ]]; then
   log_msg "ERROR: old hostname or ip missed (something is wrong), exiting"
   exit 1
+fi
+
+## get env
+get_ovf_xml $1
+if [[ $? == 1 ]]; then
+  rm $LOG_FILE
+  exit 0
 fi
 
 ## get values from ovf
