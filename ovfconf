@@ -43,11 +43,11 @@ log_msg() {
   local msg=$1
   if [[ -z $LOG_JUST_PRINT || $LOG_JUST_PRINT == "no" ]]; then
     echo "`date \"+%b %d %T\"` $msg"
-    if [[ ! -z $LOG_FILE ]]; then
-      echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
-    fi
   else
     echo $msg
+  fi
+  if [[ ! -z $LOG_FILE ]]; then
+    echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
   fi
 }
 
