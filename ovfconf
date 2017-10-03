@@ -60,7 +60,7 @@ get_ovf_xml() {
   else
     if [[ ! -x $RPCTOOL ]]; then
       log_msg "ERROR: no vmware-rpctool found and no file given, cannot get OVF env"
-      exit 1
+      return 1
     fi
     $RPCTOOL 'info-get guestinfo.ovfEnv' > $OVF_FILE 2>/dev/null
   fi
@@ -69,7 +69,7 @@ get_ovf_xml() {
     log_msg "NOTE: got OVF file"
     return 0
   else
-    # log_msg "INFO: no OVF environment found"
+    log_msg "ERROR: no OVF environment found"
     rm $OVF_FILE
     return 1
   fi
