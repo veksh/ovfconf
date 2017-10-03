@@ -38,11 +38,16 @@ if [[ ! -x $RPCTOOL ]]; then
   RPCTOOL=/usr/lib/vmware-tools/sbin/vmware-rpctool 
 fi
 
+## log to stdout (with optional timestamp) and to file (if defined)
 log_msg() {
   local msg=$1
-  echo "`date \"+%b %d %T\"` $msg"
-  if [[ ! -z $LOG_FILE ]]; then
-    echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
+  if [[ -z $LOG_JUST_PRINT || $LOG_JUST_PRINT == "no" ]]; then
+    echo "`date \"+%b %d %T\"` $msg"
+    if [[ ! -z $LOG_FILE ]]; then
+      echo "`date \"+%b %d %T\"` $msg" >> $LOG_FILE
+    fi
+  else
+    echo $msg
   fi
 }
 
@@ -121,6 +126,7 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export syslog_conf=$ETC/rsyslog.conf
   export ERASE_SSH_KEYS="check"
   export CLEAN_IFACE_MAC="yes"
+  export LOG_JUST_PRINT="yes"
 fi
 
 if [[ -r "$ETC/SuSE-release" ]]; then
@@ -140,6 +146,7 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   export syslog_conf=$ETC/syslog-ng/syslog-ng.conf
   export ERASE_SSH_KEYS="yes"
   export CLEAN_IFACE_MAC="no"
+  export LOG_JUST_PRINT="no"
 fi
 
 ## get current values
