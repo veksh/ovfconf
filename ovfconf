@@ -82,15 +82,15 @@ get_ovf_var() {
 ## main
 # test run: rm -rf etc && cp -r etc_phoenix/ etc && ./reconf_from_ovf ovfEnv.rhino.short.xml 
 
+## clear log
+rm $LOG_FILE >/dev/null 2>&1
+touch $LOG_FILE
+
 ## check platform
 if [[ ! (-r "$ETC/redhat-release" || -r "$ETC/SuSE-release") ]]; then
   log_msg "ERROR: only SLES and CentOS/RHEL are supported"
   exit 1
 fi
-
-## clear log
-rm $LOG_FILE >/dev/null 2>&1
-touch $LOG_FILE
 
 ## common settings
 export resolv_conf="$ETC/resolv.conf"
