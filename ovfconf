@@ -184,13 +184,13 @@ if [[ "X$new_hostname" == "X" ]]; then
   exit 0
 fi
 
-if [[ "X$new_ip" == "X" ]]; then
-  log_msg "ERROR: new ip is not found, exiting"
+if [[ "$new_hostname.$new_domain" == "$old_hostname.$old_domain" ]]; then
+  log_msg "INFO: hostname unchanged ($new_hostname.$new_domain), nothing to do"
   exit 0
 fi
 
-if [[ $new_hostname == $old_hostname && ("X$new_domain" == "X" || $new_domain == $old_domain) ]]; then
-  log_msg "ERROR: new hostname is same as old ($new_hostname), exiting"
+if [[ -z $new_ip ]]; then
+  log_msg "ERROR: new ip is not found, exiting"
   exit 1
 fi
 
