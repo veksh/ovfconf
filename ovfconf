@@ -325,12 +325,12 @@ perl -pi -e 's/^(myhostname = \s*)(\S+)/\1$ENV{new_hostname}.$ENV{new_domain}/' 
 if [[ $new_domain != $old_domain || (! -z $new_relay && $new_relay != $old_relay) ]]; then
   if [[ $new_domain != $old_domain ]]; then
     log_msg "INFO:  changing domain to $new_domain"
-    perl -pi -e 's/^mydomain = \S+/mydomain = $ENV{new_domain}/' $postfix_conf
+    perl -pi -e 's/^(mydomain = \s*)(\S+)/\1$ENV{new_domain}/' $postfix_conf
   fi
 
   if [[ ! -z $new_relay && $new_relay != $old_relay ]]; then
     log_msg "INFO:  changing relay to $new_relay"
-    perl -pi -e 's/^relayhost = \S+/relayhost = $ENV{new_relay}/' $postfix_conf
+    perl -pi -e 's/^(relayhost = \s*)(\S+)/\1$ENV{new_relay}/' $postfix_conf
   fi
 fi
 
