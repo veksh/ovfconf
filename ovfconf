@@ -317,9 +317,12 @@ if [[ $syslog_type == "rsyslog" ]]; then
   fi
 fi
 
-## postfix: if domain or relay changed
+## postfix
+log_msg "NOTE: changing postix $postfix_conf"
+log_msg "INFO:  changing myhostname"
+perl -pi -e 's/^(myhostname = \s*)(\S+)/\1$ENV{new_hostname}.$ENV{new_domain}/' $postfix_conf
+#l if domain or relay changed
 if [[ $new_domain != $old_domain || (! -z $new_relay && $new_relay != $old_relay) ]]; then
-  log_msg "NOTE: changing postix $postfix_conf"
   if [[ $new_domain != $old_domain ]]; then
     log_msg "INFO:  changing domain to $new_domain"
     perl -pi -e 's/^mydomain = \S+/mydomain = $ENV{new_domain}/' $postfix_conf
