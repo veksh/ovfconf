@@ -30,7 +30,6 @@ fi
 
 # check for this suffix if set
 #CHECK_DOMAIN_SUFFIX=maxidom.ru
-CHECK_DOMAIN_SUFFIX=
 
 # rpctool binary: new from open-vm-tools, fallback to classic if not found
 RPCTOOL=/usr/bin/vmware-rpctool
@@ -83,8 +82,15 @@ get_ovf_var() {
 # test run: rm -rf etc && cp -r etc_phoenix/ etc && ./reconf_from_ovf ovfEnv.rhino.short.xml
 
 ## check platform
-if [[ ! (-r "$ETC/redhat-release" || -r "$ETC/SuSE-release") ]]; then
-  log_msg "ERROR: only SLES and CentOS/RHEL are supported"
+if [[ ! -r "$ETC/os-release" ]]; then
+  log_msg "os-release not found, cannot determine OS version"
+  exit 1
+fi
+platform=$(cat /etc/os-release | perl -ane 'print $1 if /^ID="(.*)"$/')
+release=$(cat /etc/os-release | perl -ane 'print $1 if /^VERSION_ID="(\d+)/')
+
+if [[ $platform != "centos" && $platform != "sles" ]]; then
+  log_msg "ERROR: only SLES and CentOS are supported"
   exit 1
 fi
 
@@ -104,9 +110,7 @@ export nrpe_conf="$ETC/nagios/nrpe.cfg"
 # also: affects /etc/hosts, /etc/passwd
 
 ## platform and version specific
-if [[ -r "$ETC/redhat-release" ]]; then
-  export platform="redhat"
-  release=$(cat $ETC/redhat-release | perl -ane 'print $1 if /release (\d+)\./')
+if [[ $platform == "centos" ]]; then
   if [[ $release != 7 ]]; then
     log_msg "ERROR: CentOS/RHEL version 7.x is supported (you have $release)"
     exit 1
@@ -124,11 +128,9 @@ if [[ -r "$ETC/redhat-release" ]]; then
   export LOG_JUST_PRINT="yes"
 fi
 
-if [[ -r "$ETC/SuSE-release" ]]; then
-  export platform="sles"
-  release=$(cat $ETC/SuSE-release | perl -ane 'print $1 if /VERSION = (\d+)/')
-  if [[ $release != 11 && $release != 12 ]]; then
-    log_msg "ERROR: SLES version 11.x or 12.x is required (you have $release)"
+if [[ $platform == "sles" ]]; then
+  if [[ $release != 11 && $release != 12 && $release != 15 ]]; then
+    log_msg "ERROR: SLES version 11, 15 or 15 is required (you have $release)"
     exit 1
   fi
   export netcfg_path="sysconfig/network"
@@ -136,7 +138,11 @@ if [[ -r "$ETC/SuSE-release" ]]; then
   export if0=$(ls $ETC/$netcfg_path/ifcfg-* | perl -ane 'if (/ifcfg-(?!lo)(\S+)/) {print $1; exit 0}')
   export iface_conf="$ETC/$netcfg_path/ifcfg-$if0"
   export route_conf="$ETC/$netcfg_path/routes"
-  export ntp_conf="$ETC/ntp.conf"
+  if [[ $release == 15 ]]; then
+    export ntp_conf="$ETC/chrony.conf"
+  else
+    export ntp_conf="$ETC/ntp.conf"
+  fi
   if [[ $release == 11 ]]; then
     export syslog_type="syslog-ng"
     export syslog_conf=$ETC/syslog-ng/syslog-ng.conf

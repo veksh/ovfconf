@@ -43,7 +43,7 @@ Other optionally configurable vApp parameters include:
 Finally, ssh host keys are erased (to be automatically regenerated for new host) and so
 clone is fully configured at the end of boot process.
 
-Script is tested on Suse Linux Enterprise (11.x and 12.x) and CentOS 7 (and will refuse to run
+Script is tested on Suse Linux Enterprise (11.0 to 15.1) and CentOS 7 (and will refuse to run
 elsewhere) under VMWare ESXi 5.5 - 6.5 hypervisor. Changes to adapt it to other platforms will
 be minimal, and there is a special "test" mode to check effects on copy of "/etc" (see
 source and "test" directory).
