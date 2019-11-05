@@ -160,7 +160,7 @@ export old_hostname=$(cat $hostname_conf | cut -d. -f1)
 export old_domain=$(cat $hostname_conf | cut -d. -f2-)
 export old_ip=$(cat $iface_conf | perl -ne 'print $2 if /IPADDR=(\W?)([0-9.]+)/')
 if [[ ! -z $route_conf ]]; then
-  export old_gw=$(cat $route_conf | grep 'default' | cut -d' ' -f2)
+  export old_gw=$(cat $route_conf | perl -ne 'print $1 if /default +([0-9.]+)/')
 else
   export old_gw=$(cat $iface_conf | perl -ne 'print $2 if /GATEWAY=(\W?)([0-9.]+)/')
 fi
